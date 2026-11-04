@@ -13,7 +13,11 @@ jobs:
           GAME_PASSWORD: ${{ secrets.GAME_PASSWORD }}
         run: |
           if [ -z "$GAME_PASSWORD" ]; then echo "The GAME_PASSWORD secret is missing (Settings > Secrets and variables > Actions)."; exit 1; fi
-          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:GAME_PASSWORD -in game.tar.gz.enc | tar xzf -
+          # ignore spaces, line breaks and stray quote/backtick characters picked up while pasting the secret
+          export PW="$(printf '%s' "$GAME_PASSWORD" | tr -d '[:space:]`"'"'"'')"
+          if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:PW -in game.tar.gz.enc -out game.tar.gz 2>/dev/null || ! gzip -t game.tar.gz 2>/dev/null; then
+            echo "::error::GAME_PASSWORD doesn't match. Delete the secret and add it again with the exact password."; exit 1; fi
+          tar xzf game.tar.gz && rm game.tar.gz
           ls www
       - uses: actions/setup-java@v4
         with:
