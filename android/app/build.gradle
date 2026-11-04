@@ -1,0 +1,24 @@
+plugins { id "com.android.application" }
+
+android {
+    namespace "com.divatouch.app"
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.divatouch.app"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+    // the game files (index.html, ui/, songs/) are copied in from ../www by the build
+    sourceSets { main { assets.srcDirs = ["../../www"] } }
+    // keep media uncompressed inside the APK so it can be streamed and seeked directly
+    androidResources { noCompress += ["mp4", "mp3", "ogg", "webp", "png", "jpg", "dsc", "txt"] }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

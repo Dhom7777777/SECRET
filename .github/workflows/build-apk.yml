@@ -1,0 +1,34 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unlock game files
+        env:
+          GAME_PASSWORD: ${{ secrets.GAME_PASSWORD }}
+        run: |
+          if [ -z "$GAME_PASSWORD" ]; then echo "The GAME_PASSWORD secret is missing (Settings > Secrets and variables > Actions)."; exit 1; fi
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:GAME_PASSWORD -in game.tar.gz.enc | tar xzf -
+          ls www
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Build APK
+        working-directory: android
+        run: gradle assembleRelease --no-daemon --stacktrace
+      - name: Rename
+        run: cp android/app/build/outputs/apk/release/app-release.apk DivaTouch.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DivaTouch-apk
+          path: DivaTouch.apk
+          retention-days: 1
