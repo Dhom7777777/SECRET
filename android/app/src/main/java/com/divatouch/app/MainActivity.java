@@ -1,6 +1,10 @@
 package com.divatouch.app;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.Intent;
+import android.net.Uri;
+import android.webkit.ValueCallback;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
@@ -17,6 +21,8 @@ public class MainActivity extends Activity {
     // a fixed port keeps the page's address the same every launch, so saved songs, scores and settings stay
     static final int PORT = 18439;
     private WebView web;
+    private static final int PICK = 7001;
+    private ValueCallback<Uri[]> pickCb;
     private static AssetServer server;
 
     @Override protected void onCreate(Bundle b) {
@@ -34,10 +40,25 @@ public class MainActivity extends Activity {
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
         s.setSupportZoom(false);
+        s.setAllowContentAccess(true);
         s.setBuiltInZoomControls(false);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         web.setWebViewClient(new WebViewClient());
-        web.setWebChromeClient(new WebChromeClient());
+        // file pickers (Import Song, Import .dva): a WebView can't open one by itself, the app has to
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams p) {
+                if (pickCb != null) pickCb.onReceiveValue(null);
+                pickCb = cb;
+                // any file type: phones don't know .dsc / .dva, so a type filter would hide them
+                Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("*/*");
+                if (p != null && p.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                try { startActivityForResult(Intent.createChooser(i, "Choose file"), PICK); }
+                catch (Exception e) { pickCb = null; cb.onReceiveValue(null); return false; }
+                return true;
+            }
+        });
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.setVerticalScrollBarEnabled(false);
         web.setHorizontalScrollBarEnabled(false);
@@ -59,6 +80,21 @@ public class MainActivity extends Activity {
                     | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                     | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
+    }
+
+    @Override protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != PICK || pickCb == null) return;
+        Uri[] out = null;
+        if (res == RESULT_OK && data != null) {
+            ClipData clip = data.getClipData();
+            if (clip != null && clip.getItemCount() > 0) {
+                out = new Uri[clip.getItemCount()];
+                for (int k = 0; k < out.length; k++) out[k] = clip.getItemAt(k).getUri();
+            } else if (data.getData() != null) out = new Uri[]{ data.getData() };
+        }
+        pickCb.onReceiveValue(out);
+        pickCb = null;
     }
 
     @Override public void onWindowFocusChanged(boolean f) { super.onWindowFocusChanged(f); if (f) hideBars(); }
